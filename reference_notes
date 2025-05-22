@@ -1,0 +1,74 @@
+✅ STEP 1: Login to Azure
+az login
+
+
+✅ STEP 2: Set Required Variables
+# Customize these values
+RESOURCE_GROUP="myResourceGroup"
+ACR_NAME="myacrname7981153085"  # must be globally unique
+LOCATION="eastus"
+APP_SERVICE_PLAN="myAppServicePlan"
+WEB_APP_NAME="my-flask-webapp-7981153085"  # must be globally unique
+IMAGE_NAME="flask_app"
+IMAGE_TAG="latest"
+
+
+✅ STEP 3: Create Resource Group
+az group create --name $RESOURCE_GROUP --location $LOCATION
+
+
+✅ STEP 4: Create Azure Container Registry (ACR)
+az acr create --resource-group $RESOURCE_GROUP --name $ACR_NAME --sku Basic --admin-enabled true
+
+
+✅ STEP 5: Build and Push Docker Image to ACR
+# Login to ACR
+az acr login --name $ACR_NAME
+
+# Get ACR login server
+ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --query "loginServer" --output tsv)
+
+# Tag your local image
+docker tag $IMAGE_NAME:$IMAGE_TAG $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG
+
+# Push image to ACR
+docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG
+
+
+✅ STEP 6: Create App Service Plan (Linux)
+az appservice plan create --name $APP_SERVICE_PLAN  --resource-group $RESOURCE_GROUP  --sku B1 --is-linux  --location "Central US"
+
+
+✅ STEP 7: Create Web App with Docker Container
+az webapp create --resource-group $RESOURCE_GROUP   --plan $APP_SERVICE_PLAN   --name $WEB_APP_NAME   --deployment-container-image-name $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG 
+
+✅ STEP 8: Configure Web App to Use ACR Credentials
+# Get ACR credentials
+ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query "username" --output tsv)
+ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" --output tsv)
+
+# Set container settings for the web app
+az webapp config container set --name $WEB_APP_NAME  --resource-group $RESOURCE_GROUP  --docker-custom-image-name $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG  --docker-registry-server-url https://$ACR_LOGIN_SERVER  --docker-registry-server-user $ACR_USERNAME  --docker-registry-server-password $ACR_PASSWORD
+
+
+✅ STEP 9: Browse Your App
+echo "https://$WEB_APP_NAME.azurewebsites.net"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+az group delete --name $RESOURCE_GROUP --yes --no-wait
+
